@@ -22,6 +22,7 @@ class TestWebTester(unittest.TestCase):
 
     def test_cyclic_redirect(self):
         """Test detection of cyclic redirects."""
+
         output = self.run_webtester("https://github.com/danigallegdup/WebTester")
         self.assertIn("Cyclic redirect detected", output)
 
@@ -37,9 +38,11 @@ class TestWebTester(unittest.TestCase):
 
     def test_multiple_cookies(self):
         """Test a website that sets multiple cookies."""
-        output = self.run_webtester("https://www.facebook.com")
+        output = self.run_webtester("https://httpbin.org/cookies/set?name=value")
         self.assertIn("Cookies\n=======", output)
-        self.assertRegex(output, r"Cookie Name: c_user")
+        self.assertRegex(output, r"Cookie Name: name")
+
+
 
     def test_malformed_url(self):
         """Test behavior with a malformed URL."""
