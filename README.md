@@ -35,7 +35,7 @@ The submission must include:
 2. Upload the `WebTester.py` script to your workspace.
 3. Execute the tool using:
 
-```
+```python
    
    python3 WebTester.py <URL>
 ```
@@ -62,12 +62,14 @@ The tool outputs:
 
 Input:
 
-```
+```python
+
 python3 WebTester.py https://github.com/danigallegdup/WebTester
 ```
 
-Output:  
-```
+Output:
+  
+```python
 
 website: www.example.com
 1. Supports http2: yes

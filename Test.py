@@ -1,6 +1,5 @@
 import unittest
 import subprocess
-import re
 
 class TestWebTester(unittest.TestCase):
     def run_webtester(self, url):
