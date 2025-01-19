@@ -3,6 +3,7 @@ import ssl  # Import the SSL module to support secure HTTPS connections.
 import re  # Import the regular expressions module to parse and extract data from HTTP responses.
 import sys  # Import the sys module to handle command-line arguments.
 from html.parser import HTMLParser  # Import HTMLParser to detect password forms in HTML responses.
+import json
 
 class PasswordFormParser(HTMLParser):
     """HTML Parser to detect password input fields in forms."""
@@ -32,79 +33,160 @@ def check_http2_support(host, port=443):
         return False  # Return False if HTTP/2 support cannot be determined.
 
 
+# def send_http_request(host, path="/", use_https=False, max_redirects=5):
+#     """Send an HTTP or HTTPS request and handle redirects."""
+#     visited_urls = set()  # Track visited URLs to detect cyclic redirects.
+#     protocol = "https" if use_https else "http"  # Determine the protocol based on input.
+
+#     try:
+#         for _ in range(max_redirects):
+#             full_url = f"{protocol}://{host}{path}"  # Construct the full URL.
+#             if full_url in visited_urls:
+#                 print("Cyclic redirect detected. Stopping.")
+#                 return "Cyclic redirect detected"  # Return if cyclic redirects are found.
+#             visited_urls.add(full_url)  # Add URL to visited set.
+
+#             port = 443 if use_https else 80  # Set port based on protocol.
+#             context = ssl.create_default_context() if use_https else None  # Create SSL context for HTTPS.
+
+#             with socket.create_connection((host, port)) as conn:
+#                 if use_https:
+#                     conn = context.wrap_socket(conn, server_hostname=host)  # Wrap connection in SSL for HTTPS.
+
+#                 # Send an HTTP GET request.
+#                 request = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n"
+#                 conn.sendall(request.encode())
+#                 response = b""
+#                 while True:
+#                     data = conn.recv(4096)  # Read response in chunks.
+#                     if not data:
+#                         break
+#                     response += data
+#                 response_text = response.decode(errors="ignore")  # Decode response to string.
+
+#                 # Check for redirect headers.
+#                 match = re.search(r"^Location: (.*?)\r\n", response_text, re.MULTILINE | re.IGNORECASE)
+#                 if match:
+#                     new_url = match.group(1)
+#                     print(f"Redirecting to: {new_url}")
+#                     match = re.match(r"https?://([^/]+)(/.*)?", new_url)
+#                     if not match:
+#                         print("Invalid redirect URL.")
+#                         return None
+#                     host, path = match.groups()  # Update host and path for the next request.
+#                     path = path or "/"
+#                     protocol = "https" if new_url.startswith("https") else "http"
+#                     use_https = protocol == "https"
+#                 else:
+#                     return response_text  # Return final response if no redirect is found.
+
+#         print("Too many redirects.")
+#         return None  # Return None if maximum redirects exceeded.
+
+#     except socket.error as e:
+#         print(f"Network error: {e}")  # Handle network-related errors.
+#         return None
+
+#     except ssl.SSLError as e:
+#         print(f"SSL error: {e}")  # Handle SSL-related errors.
+#         return None
+
+#     except Exception as e:
+#         print(f"Unexpected error: {e}")  # Handle unexpected errors.
+#         return None
+
 def send_http_request(host, path="/", use_https=False, max_redirects=5):
     """Send an HTTP or HTTPS request and handle redirects."""
-    visited_urls = set()  # Track visited URLs to detect cyclic redirects.
-    protocol = "https" if use_https else "http"  # Determine the protocol based on input.
+    visited_urls = set()
+    protocol = "https" if use_https else "http"
+    cookies = {}
 
     try:
         for _ in range(max_redirects):
-            full_url = f"{protocol}://{host}{path}"  # Construct the full URL.
+            full_url = f"{protocol}://{host}{path}".rstrip("/")
             if full_url in visited_urls:
                 print("Cyclic redirect detected. Stopping.")
-                return "Cyclic redirect detected"  # Return if cyclic redirects are found.
-            visited_urls.add(full_url)  # Add URL to visited set.
+                return "Cyclic redirect detected"
+            visited_urls.add(full_url)
 
-            port = 443 if use_https else 80  # Set port based on protocol.
-            context = ssl.create_default_context() if use_https else None  # Create SSL context for HTTPS.
+            port = 443 if use_https else 80
+            context = ssl.create_default_context() if use_https else None
 
             with socket.create_connection((host, port)) as conn:
                 if use_https:
-                    conn = context.wrap_socket(conn, server_hostname=host)  # Wrap connection in SSL for HTTPS.
+                    conn = context.wrap_socket(conn, server_hostname=host)
 
-                # Send an HTTP GET request.
-                request = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n"
+                # Include cookies in the request
+                cookie_header = "; ".join([f"{name}={value}" for name, value in cookies.items()])
+                request = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n"
+                if cookie_header:
+                    request += f"Cookie: {cookie_header}\r\n"
+                request += "\r\n"
+
                 conn.sendall(request.encode())
                 response = b""
                 while True:
-                    data = conn.recv(4096)  # Read response in chunks.
+                    data = conn.recv(4096)
                     if not data:
                         break
                     response += data
-                response_text = response.decode(errors="ignore")  # Decode response to string.
+                response_text = response.decode(errors="ignore")
 
-                # Check for redirect headers.
+                # Extract cookies from Set-Cookie headers
+                cookie_headers = re.findall(r"Set-Cookie: (.*?)\r\n", response_text, re.IGNORECASE)
+                for cookie in cookie_headers:
+                    match = re.match(r"([^=]+)=([^;]+);", cookie)
+                    if match:
+                        name, value = match.groups()
+                        cookies[name] = value
+
+                # Check for redirect headers
                 match = re.search(r"^Location: (.*?)\r\n", response_text, re.MULTILINE | re.IGNORECASE)
                 if match:
                     new_url = match.group(1)
-                    print(f"Redirecting to: {new_url}")
+                    if new_url.startswith("/"):
+                        new_url = f"{protocol}://{host}{new_url}"
                     match = re.match(r"https?://([^/]+)(/.*)?", new_url)
                     if not match:
                         print("Invalid redirect URL.")
                         return None
-                    host, path = match.groups()  # Update host and path for the next request.
+                    host, path = match.groups()
                     path = path or "/"
                     protocol = "https" if new_url.startswith("https") else "http"
                     use_https = protocol == "https"
                 else:
-                    return response_text  # Return final response if no redirect is found.
+                    return response_text
 
         print("Too many redirects.")
-        return None  # Return None if maximum redirects exceeded.
-
-    except socket.error as e:
-        print(f"Network error: {e}")  # Handle network-related errors.
-        return None
-
-    except ssl.SSLError as e:
-        print(f"SSL error: {e}")  # Handle SSL-related errors.
         return None
 
     except Exception as e:
-        print(f"Unexpected error: {e}")  # Handle unexpected errors.
+        print(f"Unexpected error: {e}")
         return None
 
 
 def parse_cookies(response):
     """Parse cookies from the HTTP response."""
-    cookie_headers = re.findall(r"Set-Cookie: (.*?)\r\n", response, re.IGNORECASE)  # Extract cookie headers.
     cookies = []
-    for match in re.finditer(r"Set-Cookie: ([^=]+)=([^;]+);(?:.*?domain=([^;]+))?;?(?:.*?expires=([^;]+))?", response, re.IGNORECASE):
-        name, value, domain, expires = match.groups()
-        # Append cookie details to the list.
-        cookies.append({"name": name, "value": value, "domain": domain, "expires": expires})
-    return cookies  # Return the list of cookies.
+    
+    # Extract cookies from Set-Cookie headers
+    cookie_headers = re.findall(r"Set-Cookie: (.*?)\r\n", response, re.IGNORECASE)
+    for cookie in cookie_headers:
+        match = re.match(r"([^=]+)=([^;]+);", cookie)
+        if match:
+            name, value = match.groups()
+            cookies.append({"name": name, "value": value, "domain": None, "expires": None})
 
+    # Attempt to parse cookies from JSON body if available
+    try:
+        json_body = json.loads(response.split("\r\n\r\n", 1)[1])
+        if "cookies" in json_body:
+            for name, value in json_body["cookies"].items():
+                cookies.append({"name": name, "value": value, "domain": None, "expires": None})
+    except (json.JSONDecodeError, IndexError):
+        pass  # Ignore if the body is not JSON or malformed
+
+    return cookies
 
 def check_password_protection(response):
     """Check if the page is password-protected."""
@@ -123,6 +205,11 @@ def format_output(header, content):
     print(output)  # Print the formatted output.
 
 
+def is_valid_url(url):
+    """Check if the given URL is valid."""
+    pattern = r'^https?://[a-zA-Z0-9.-]+(?:\.[a-zA-Z]{2,})'
+    return re.match(pattern, url) is not None
+
 def main():
     """Main function to handle input and execute functionality."""
     if len(sys.argv) != 2:
@@ -130,19 +217,23 @@ def main():
         print("Please provide exactly one URL as an argument.")
         return
 
-    # Normalize the URL and add the scheme if missing.
+    # Normalize the URL and add the scheme if missing
     raw_url = sys.argv[1]
     if not re.match(r"https?://", raw_url):
-        raw_url = f"http://{raw_url}"  # Default to HTTP if no scheme is provided.
+        raw_url = f"http://{raw_url}"  # Default to HTTP if no scheme is provided
 
-    match = re.match(r"https?://([^/]+)(/.*)?", raw_url)
-    if not match:
-        print("Invalid URL format. Ensure the URL is correctly formatted.")
+    if not is_valid_url(raw_url):
+        print("Invalid URL format")
         return
 
     # Extract host and path
+    match = re.match(r"https?://([^/]+)(/.*)?", raw_url)
+    if not match:
+        print("Invalid URL format")
+        return
+
     host, path = match.groups()
-    path = path or "/"  # Default to root path if none is specified.
+    path = path or "/"  # Default to root path if none is specified
 
     # Debugging: Log raw request and output
     print("---Request begin---")
@@ -162,7 +253,7 @@ def main():
     if response:
         cookies = parse_cookies(response)
         cookies_output = "\n".join([
-            f"Cookie Name: {cookie['name']}, Domain: {cookie['domain']}, Expires: {cookie['expires']}"
+            f"Cookie Name: {cookie['name']}, Value: {cookie['value']}, Domain: {cookie['domain']}, Expires: {cookie['expires']}"
             for cookie in cookies
         ])
         format_output("Cookies", cookies_output or "No cookies found.")
@@ -174,7 +265,6 @@ def main():
         print(response[:500])  # Optional: Display first 500 characters of the response body
     else:
         print("Failed to retrieve HTTP response.")
-
 
 if __name__ == "__main__":
     try:

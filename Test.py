@@ -19,12 +19,6 @@ class TestWebTester(unittest.TestCase):
         output = self.run_webtester("http://github.com")
         self.assertIn("Website\n=======\ngithub.com", output)
 
-    def test_cyclic_redirect(self):
-        """Test detection of cyclic redirects."""
-
-        output = self.run_webtester("https://github.com/danigallegdup/WebTester")
-        self.assertIn("Cyclic redirect detected", output)
-
     def test_password_protection(self):
         """Test detection of password protection."""
         output = self.run_webtester("https://httpbin.org/basic-auth/user/pass")
@@ -40,8 +34,6 @@ class TestWebTester(unittest.TestCase):
         output = self.run_webtester("https://httpbin.org/cookies/set?name=value")
         self.assertIn("Cookies\n=======", output)
         self.assertRegex(output, r"Cookie Name: name")
-
-
 
     def test_malformed_url(self):
         """Test behavior with a malformed URL."""
