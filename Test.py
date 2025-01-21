@@ -1,6 +1,12 @@
 import unittest
 import subprocess
 
+"""
+run : python -m unittest Test.py
+
+"""
+
+
 class TestWebTester(unittest.TestCase):
     def run_webtester(self, url):
         """Helper function to run WebTester.py and capture output."""
@@ -14,6 +20,8 @@ class TestWebTester(unittest.TestCase):
         output = self.run_webtester("https://www.google.com")
         self.assertIn("HTTP/2 Support\n==============\nYes", output)
 
+
+
     def test_redirect_handling(self):
         """Test proper handling of redirects."""
         output = self.run_webtester("http://github.com")
@@ -23,6 +31,13 @@ class TestWebTester(unittest.TestCase):
         """Test detection of password protection."""
         output = self.run_webtester("https://httpbin.org/basic-auth/user/pass")
         self.assertIn("Password Protection\n===================\nYes", output)
+    
+    def test_no_password_protection(self):
+        """Test detection of password protection."""
+        output = self.run_webtester("https://httpbin.org/")
+        self.assertIn("Password Protection\n===================\nNo", output)
+    
+
 
     def test_no_cookies(self):
         """Test a website that does not set cookies."""

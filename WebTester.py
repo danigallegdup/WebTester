@@ -9,15 +9,23 @@ class PasswordFormParser(HTMLParser):
     """HTML Parser to detect password input fields in forms."""
     def __init__(self):
         super().__init__()
-        self.is_password_form = False  # Flag to indicate if a password form was detected.
+        self.is_password_form = False
+        self.forms_found = 0
+        self.has_login_keyword = False
 
     def handle_starttag(self, tag, attrs):
-        # This method checks each HTML tag to identify input fields of type "password".
+        # Check for password input fields
         if tag == "input":
             for attr_name, attr_value in attrs:
                 if attr_name == "type" and attr_value == "password":
-                    self.is_password_form = True  # Set the flag if a password field is found.
+                    self.is_password_form = True
 
+        # Track forms with potential login keywords
+        if tag == "form":
+            self.forms_found += 1
+            for attr_name, attr_value in attrs:
+                if attr_name == "action" and any(keyword in attr_value.lower() for keyword in ["login", "auth", "signin"]):
+                    self.has_login_keyword = True
 
 def check_http2_support(host, port=443):
     """Check if the server supports HTTP/2."""
@@ -190,13 +198,37 @@ def parse_cookies(response):
 
 def check_password_protection(response):
     """Check if the page is password-protected."""
-    # Look for authentication headers or 401 status code in the response.
-    if "WWW-Authenticate" in response or "401 Unauthorized" in response:
+    # Step 1: Check for HTTP status codes indicating restricted access
+    if "401 Unauthorized" in response or "403 Forbidden" in response:
         return True
 
+    # Step 2: Check for WWW-Authenticate header
+    if "WWW-Authenticate" in response or "403 Not authenticated." in response:
+        return True
+
+    # Step 3: Parse the HTML response
     parser = PasswordFormParser()
-    parser.feed(response)  # Parse the response HTML for password fields.
-    return parser.is_password_form  # Return True if password form is found.
+    parser.feed(response)
+
+    # Flag as password-protected if password input fields are detected
+    if parser.is_password_form:
+        return True
+
+    # Step 4: Check for keywords in form action attributes
+    if parser.has_login_keyword:
+        return True
+
+    # Step 5: Consider the overall response for strong indicators of login
+    keywords = ["login", "sign in", "authentication", "authenticate"]
+    lower_response = response.lower()
+    keyword_count = sum(keyword in lower_response for keyword in keywords)
+
+    # Apply a scoring system to minimize false positives
+    if keyword_count > 2 and parser.forms_found > 0:
+        return True
+
+    # Default to not password-protected
+    return False
 
 
 def format_output(header, content):
