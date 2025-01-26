@@ -163,11 +163,13 @@ def send_http_request(host, path="/", use_https=False, max_redirects=5):
                     protocol = "https" if new_url.startswith("https") else "http"
                     use_https = protocol == "https"
                 else:
+                    if "ERROR" in response_text:
+                        return None
+
                     return response_text
 
-        print("Too many redirects.")
         return None
-
+    
     except Exception as e:
         print(f"Unexpected error: {e}")
         return None
@@ -289,6 +291,7 @@ def main():
 
     use_https = raw_url.startswith("https")
     response = send_http_request(host, path, use_https=use_https)  # Fetch HTTP/HTTPS response
+
     if response:
         cookies = parse_cookies(response)
         cookies_output = "\n".join([

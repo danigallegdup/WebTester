@@ -1,8 +1,8 @@
-# **WebTester: A Web Server Testing Tool**
+# **SmartClient: A Web Server Testing Tool**
 
 ## **1. Overview**
 
-The `WebTester` tool is designed to:
+The `SmartClient` tool is designed to:
 
 1. Check if a web server supports HTTP/2.
 2. Retrieve and list cookies, including their name, expiry time, and domain (if any).
@@ -16,7 +16,7 @@ This tool is implemented in Python and uses socket programming to interact with 
 
 The submission must include:
 
-- `WebTester.py`: The Python script containing the implementation of the tool.
+- `SmartClient.py`: The Python script containing the implementation of the tool.
 - `readme.txt`: This file, explaining how to run and use the tool.
 - A single `.zip` file containing the script and this `readme.txt`.
 
@@ -32,12 +32,12 @@ The submission must include:
 ### **Execution**
 
 1. Log in to the server using SSH.
-2. Upload the `WebTester.py` script to your workspace.
+2. Upload the `SmartClient.py` script to your workspace.
 3. Execute the tool using:
 
 ```python
    
-   python3 WebTester.py <URL>
+   python3 SmartClient.py <URL>
 ```
 
    Replace `<URL>` with the target web server's URL (e.g., `www.example.com`).
@@ -64,7 +64,7 @@ Input:
 
 ```python
 
-python3 WebTester.py https://github.com/danigallegdup/WebTester
+python3 SmartClient.py https://github.com/danigallegdup/SmartClient
 ```
 
 Output:
