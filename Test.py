@@ -11,7 +11,7 @@ class TestWebTester(unittest.TestCase):
     def run_webtester(self, url):
         """Helper function to run WebTester.py and capture output."""
         result = subprocess.run([
-            "python3", "WebTester.py", url
+            "python3", "SmartClient.py", url
         ], capture_output=True, text=True)
         return result.stdout
 

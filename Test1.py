@@ -10,7 +10,7 @@ class TestWebTester(unittest.TestCase):
     def run_webtester(self, url):
         """Helper function to run WebTester.py and capture output."""
         result = subprocess.run(
-            ["python3", "WebTester.py", url],
+            ["python3", "SmartClient.py", url],
             capture_output=True,
             text=True
         )
@@ -121,6 +121,7 @@ class TestWebTester(unittest.TestCase):
             "https://login.salesforce.com",
             "https://accounts.google.com",
             # "https://id.atlassian.com/login", NO RESPONSE
+            "docs.engr.uvic.ca/docs", # Say N0
             "https://www.netflix.com/login"
         ]
         for url in protected_urls:

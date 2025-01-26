@@ -1,8 +1,8 @@
-import socket
-import ssl
-import re
-import sys
-from html.parser import HTMLParser
+import socket  # Import the socket module to establish network connections for HTTP requests.
+import ssl  # Import the SSL module to support secure HTTPS connections.
+import re  # Import the regular expressions module to parse and extract data from HTTP responses.
+import sys  # Import the sys module to handle command-line arguments.
+from html.parser import HTMLParser  # Import HTMLParser to detect password forms in HTML responses.
 import json
 
 class PasswordFormParser(HTMLParser):
@@ -14,38 +14,31 @@ class PasswordFormParser(HTMLParser):
         self.has_login_keyword = False
 
     def handle_starttag(self, tag, attrs):
+        # Check for password input fields
         if tag == "input":
-            self.is_password_form |= any(attr == ("type", "password") for attr in attrs)
+            for attr_name, attr_value in attrs:
+                if attr_name == "type" and attr_value == "password":
+                    self.is_password_form = True
+
+        # Track forms with potential login keywords
         if tag == "form":
             self.forms_found += 1
-            self.has_login_keyword |= any(
-                attr == ("action", value) and any(keyword in value.lower() for keyword in ["login", "auth", "signin"])
-                for attr, value in attrs
-            )
-
-def is_valid_url(url):
-    """Check if the given URL is valid."""
-    pattern = (
-        r'^https?://'  # Match http:// or https://
-        r'('
-        r'(([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})'  # Match domain names
-        r'|'
-        r'((\d{1,3}\.){3}\d{1,3})'  # Match IPv4 addresses
-        r')'
-    )
-    return re.match(pattern, url) is not None
+            for attr_name, attr_value in attrs:
+                if attr_name == "action" and any(keyword in attr_value.lower() for keyword in ["login", "auth", "signin"]):
+                    self.has_login_keyword = True
 
 def check_http2_support(host, port=443):
     """Check if the server supports HTTP/2."""
-    context = ssl.create_default_context()
-    context.set_alpn_protocols(["h2", "http/1.1"])
+    context = ssl.create_default_context()  # Create a default SSL context for secure connections.
+    context.set_alpn_protocols(["h2", "http/1.1"])  # Specify ALPN protocols to check HTTP/2 support.
     try:
         with socket.create_connection((host, port)) as sock:
             with context.wrap_socket(sock, server_hostname=host) as tls:
+                # Check if "h2" (HTTP/2) is the selected protocol.
                 return "h2" in tls.selected_alpn_protocol()
     except Exception as e:
-        print(f"Error checking HTTP/2 support: {e}")
-        return False
+        print(f"Error while checking HTTP/2 support: {e}")  # Handle errors gracefully.
+        return False  # Return False if HTTP/2 support cannot be determined.
 
 def send_http_request(host, path="/", use_https=False, max_redirects=5):
     """Send an HTTP or HTTPS request and handle redirects."""
@@ -57,7 +50,7 @@ def send_http_request(host, path="/", use_https=False, max_redirects=5):
         for _ in range(max_redirects):
             full_url = f"{protocol}://{host}{path}".rstrip("/")
             if full_url in visited_urls:
-                print("Cyclic redirect detected.")
+                print("Cyclic redirect detected. Stopping.")
                 return "Cyclic redirect detected"
             visited_urls.add(full_url)
 
@@ -68,6 +61,7 @@ def send_http_request(host, path="/", use_https=False, max_redirects=5):
                 if use_https:
                     conn = context.wrap_socket(conn, server_hostname=host)
 
+                # Include cookies in the request
                 cookie_header = "; ".join([f"{name}={value}" for name, value in cookies.items()])
                 request = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n"
                 if cookie_header:
@@ -75,80 +69,184 @@ def send_http_request(host, path="/", use_https=False, max_redirects=5):
                 request += "\r\n"
 
                 conn.sendall(request.encode())
-                response = conn.recv(4096).decode(errors="ignore")
+                response = b""
+                while True:
+                    data = conn.recv(4096)
+                    if not data:
+                        break
+                    response += data
+                response_text = response.decode(errors="ignore")
 
-                cookies.update(parse_cookies(response))
-                match = re.search(r"^Location: (.*?)\r\n", response, re.MULTILINE | re.IGNORECASE)
+                # Extract cookies from Set-Cookie headers
+                cookie_headers = re.findall(r"Set-Cookie: (.*?)\r\n", response_text, re.IGNORECASE)
+                for cookie in cookie_headers:
+                    match = re.match(r"([^=]+)=([^;]+);", cookie)
+                    if match:
+                        name, value = match.groups()
+                        cookies[name] = value
+
+                # Check for redirect headers
+                match = re.search(r"^Location: (.*?)\r\n", response_text, re.MULTILINE | re.IGNORECASE)
                 if match:
                     new_url = match.group(1)
-                    host, path = parse_url(new_url)
+                    if new_url.startswith("/"):
+                        new_url = f"{protocol}://{host}{new_url}"
+                    match = re.match(r"https?://([^/]+)(/.*)?", new_url)
+                    if not match:
+                        print("Invalid redirect URL.")
+                        return None
+                    host, path = match.groups()
+                    path = path or "/"
                     protocol = "https" if new_url.startswith("https") else "http"
                     use_https = protocol == "https"
                 else:
-                    return response
+                    if "ERROR" in response_text:
+                        return None
+
+                    return response_text
 
         return None
+    
     except Exception as e:
-        print(f"Error during HTTP request: {e}")
+        print(f"Unexpected error: {e}")
         return None
+
 
 def parse_cookies(response):
     """Parse cookies from the HTTP response."""
-    cookies = {}
-    cookie_headers = re.findall(r"Set-Cookie: ([^;]+);", response, re.IGNORECASE)
+    cookies = []
+    
+    # Extract cookies from Set-Cookie headers
+    cookie_headers = re.findall(r"Set-Cookie: (.*?)\r\n", response, re.IGNORECASE)
     for cookie in cookie_headers:
-        name, value = cookie.split("=", 1)
-        cookies[name] = value
+        match = re.match(r"([^=]+)=([^;]+);", cookie)
+        if match:
+            name, value = match.groups()
+            cookies.append({"name": name, "value": value, "domain": None, "expires": None})
+
+    # Attempt to parse cookies from JSON body if available
+    try:
+        json_body = json.loads(response.split("\r\n\r\n", 1)[1])
+        if "cookies" in json_body:
+            for name, value in json_body["cookies"].items():
+                cookies.append({"name": name, "value": value, "domain": None, "expires": None})
+    except (json.JSONDecodeError, IndexError):
+        pass  # Ignore if the body is not JSON or malformed
+
     return cookies
 
 def check_password_protection(response):
     """Check if the page is password-protected."""
-    if any(code in response for code in ["401 Unauthorized", "403 Forbidden", "WWW-Authenticate"]):
+    # Step 1: Check for HTTP status codes indicating restricted access
+    if "401 Unauthorized" in response or "403 Forbidden" in response:
         return True
 
+    # Step 2: Check for WWW-Authenticate header
+    if "WWW-Authenticate" in response or "403 Not authenticated." in response:
+        return True
+
+    # Step 3: Parse the HTML response
     parser = PasswordFormParser()
     parser.feed(response)
-    return parser.is_password_form or parser.has_login_keyword
+
+    # Flag as password-protected if password input fields are detected
+    if parser.is_password_form:
+        return True
+
+    # Step 4: Check for keywords in form action attributes
+    if parser.has_login_keyword:
+        return True
+
+    # Step 5: Consider the overall response for strong indicators of login
+    keywords = ["login", "sign in", "authentication", "authenticate"]
+    lower_response = response.lower()
+    keyword_count = sum(keyword in lower_response for keyword in keywords)
+
+    # Apply a scoring system to minimize false positives
+    if keyword_count > 2 and parser.forms_found > 0:
+        return True
+
+    # Default to not password-protected
+    return False
+
 
 def format_output(header, content):
-    """Format and print the output."""
-    print(f"\n{header}\n{'=' * len(header)}\n{content}")
+    """Format the output for better readability."""
+    output = f"\n{header}\n{'=' * len(header)}\n{content}"  # Create a formatted section with a title and content.
+    print(output)  # Print the formatted output.
 
-def parse_url(url):
-    """Extract host and path from a URL."""
-    match = re.match(r"https?://([^/]+)(/.*)?", url)
-    if not match:
-        raise ValueError("Invalid URL format")
-    return match.group(1), match.group(2) or "/"
+
+def is_valid_url(url): 
+    """Check if the given URL is valid."""
+    pattern = (
+        r'^https?://'                   # Match http:// or https://
+        r'('
+        r'(([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})'  # Match domain names
+        r'|'
+        r'((\d{1,3}\.){3}\d{1,3})'     # Match IPv4 addresses
+        r')'
+    )
+    return re.match(pattern, url) is not None
 
 def main():
     """Main function to handle input and execute functionality."""
     if len(sys.argv) != 2:
         print("Usage: python3 WebTester.py <URL>")
+        print("Please provide exactly one URL as an argument.")
         return
 
+    # Normalize the URL and add the scheme if missing
     raw_url = sys.argv[1]
     if not re.match(r"https?://", raw_url):
-        raw_url = f"http://{raw_url}"
+        raw_url = f"http://{raw_url}"  # Default to HTTP if no scheme is provided
 
     if not is_valid_url(raw_url):
-        print("Invalid URL format.")
+        print(" line 258 Invalid URL format")
         return
 
-    host, path = parse_url(raw_url)
+    # Extract host and path
+    match = re.match(r"https?://([^/]+)(/.*)?", raw_url)
+    if not match:
+        print("line 264 Invalid URL format")
+        return
+
+    host, path = match.groups()
+    path = path or "/"  # Default to root path if none is specified
+
+    # Debugging: Log raw request and output
+    print("---Request begin---")
+    print(f"GET {raw_url} HTTP/1.1")
+    print(f"Host: {host}")
+    print("Connection: Keep-Alive")
+    print("---Request end---\n")
+
+    # Format and display output
     format_output("Website", host)
 
-    supports_http2 = check_http2_support(host)
-    format_output("HTTP/2 Support", "Yes" if supports_http2 else "No")
+    supports_http2 = check_http2_support(host)  # Check HTTP/2 support
+    format_output("HTTP/2 Support", f"{'Yes' if supports_http2 else 'No'}")
 
-    response = send_http_request(host, path, use_https=raw_url.startswith("https"))
+    use_https = raw_url.startswith("https")
+    response = send_http_request(host, path, use_https=use_https)  # Fetch HTTP/HTTPS response
+
     if response:
-        format_output("Cookies", json.dumps(parse_cookies(response), indent=4))
-        format_output("Password Protection", "Yes" if check_password_protection(response) else "No")
-        print("\nResponse Body Preview:\n", response[:500])
+        cookies = parse_cookies(response)
+        cookies_output = "\n".join([
+            f"Cookie Name: {cookie['name']}, Value: {cookie['value']}, Domain: {cookie['domain']}, Expires: {cookie['expires']}"
+            for cookie in cookies
+        ])
+        format_output("Cookies", cookies_output or "No cookies found.")
+
+        is_password_protected = check_password_protection(response)
+        format_output("Password Protection", f"{'Yes' if is_password_protected else 'No'}")
+
+        print("\n---Response body---\n")
+        print(response[:500])  # Optional: Display first 500 characters of the response body
+    else:
+        print("Failed to retrieve HTTP response.")
 
 if __name__ == "__main__":
     try:
-        main()
+        main()  # Run the main function when the script is executed.
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"An unexpected error occurred: {e}")
