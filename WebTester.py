@@ -237,9 +237,16 @@ def format_output(header, content):
     print(output)  # Print the formatted output.
 
 
-def is_valid_url(url):
+def is_valid_url(url): 
     """Check if the given URL is valid."""
-    pattern = r'^https?://[a-zA-Z0-9.-]+(?:\.[a-zA-Z]{2,})'
+    pattern = (
+        r'^https?://'                   # Match http:// or https://
+        r'('
+        r'(([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,})'  # Match domain names
+        r'|'
+        r'((\d{1,3}\.){3}\d{1,3})'     # Match IPv4 addresses
+        r')'
+    )
     return re.match(pattern, url) is not None
 
 def main():
@@ -255,13 +262,13 @@ def main():
         raw_url = f"http://{raw_url}"  # Default to HTTP if no scheme is provided
 
     if not is_valid_url(raw_url):
-        print("Invalid URL format")
+        print(" line 258 Invalid URL format")
         return
 
     # Extract host and path
     match = re.match(r"https?://([^/]+)(/.*)?", raw_url)
     if not match:
-        print("Invalid URL format")
+        print("line 264 Invalid URL format")
         return
 
     host, path = match.groups()

@@ -30,7 +30,7 @@ class TestWebTester(unittest.TestCase):
     def test_network_error(self):
         """Test behavior with unreachable host."""
         output = self.run_webtester("http://0.0.0.0")
-        self.assertIn("Invalid URL format", output)
+        # Invalid URL format
         self.assertIn("Failed to retrieve HTTP response.", output)
 
     # def test_unexpected_error(self):
