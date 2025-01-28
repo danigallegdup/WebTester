@@ -2,6 +2,11 @@ SmartClient: A Comprehensive Web Server Testing Tool
 1. Overview
 SmartClient is a Python-based tool designed to meet the requirements of the CSC361 assignment by:
 
+INPUT FORMAT
+
+python3 SmartClient.py {URL}
+
+
 Determining HTTP/2 Support: Uses ALPN (Application-Layer Protocol Negotiation) to identify if the target web server supports HTTP/2.
 Handling HTTP Redirects: Automatically follows redirects (e.g., 301, 302) while preventing infinite loops.
 Parsing Cookies: Extracts cookies from Set-Cookie headers and JSON bodies, providing details such as name, value, domain, and expiry.
