@@ -94,18 +94,18 @@ class TestWebTester(unittest.TestCase):
         self.assertIn("Cookies\n=======", output)
         self.assertRegex(output, r"Cookie Name: name")
 
-    # def test_multiple_cookies(self):
-    #     """Test a website that sets multiple cookies."""
-    #     output = self.run_webtester("https://httpbin.org/response-headers?Set-Cookie=foo=bar&Set-Cookie=baz=qux")
-    #     self.assertIn("Cookies\n=======", output)
-    #     self.assertRegex(output, r"Cookie Name: foo")
-    #     self.assertRegex(output, r"Cookie Name: baz")
+    def test_multiple_cookies(self):
+        """Test a website that sets multiple cookies."""
+        output = self.run_webtester("https://httpbin.org/response-headers?Set-Cookie=foo=bar&Set-Cookie=baz=qux")
+        self.assertIn("Cookies\n=======", output)
+        self.assertRegex(output, r"Cookie Name: foo")
+        self.assertRegex(output, r"Cookie Name: baz")
 
-    # def test_cookie_with_expiry(self):
-    #     """Test a website that sets cookies with expiry dates."""
-    #     output = self.run_webtester("https://httpbin.org/response-headers?Set-Cookie=test=123%3B%20Expires=Wed%2C%2021%20Jan%202026%2012%3A34%3A56%20GMT")
-    #     self.assertRegex(output, r"Cookie Name: test")
-    #     self.assertRegex(output, r"Expires: Wed, 21 Jan 2026 12:34:56 GMT")
+    def test_cookie_with_expiry(self):
+        """Test a website that sets cookies with expiry dates."""
+        output = self.run_webtester("https://httpbin.org/response-headers?Set-Cookie=test=123%3B%20Expires=Wed%2C%2021%20Jan%202026%2012%3A34%3A56%20GMT")
+        self.assertRegex(output, r"Cookie Name: test")
+        self.assertRegex(output, r"Expires: Wed, 21 Jan 2026 12:34:56 GMT")
 
     def test_cookie_in_redirect(self):
         """Test cookies set during redirects."""
@@ -120,7 +120,7 @@ class TestWebTester(unittest.TestCase):
             "https://httpbin.org/basic-auth/user/pass",
             "https://login.salesforce.com",
             "https://accounts.google.com",
-            "docs.engr.uvic.ca/docs", # Say N0
+            "docs.engr.uvic.ca/docs", 
             "https://www.netflix.com/login"
         ]
         for url in protected_urls:

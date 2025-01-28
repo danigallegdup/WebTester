@@ -191,7 +191,7 @@ def handle_redirect(response_text, host, path, protocol, use_https):
 
 def parse_cookies(response):
     """
-    Parse cookies from the HTTP response.
+    Parse cookies from the HTTP response, including expiry dates.
 
     Args:
         response (str): The HTTP response text.
@@ -212,9 +212,22 @@ def parse_cookies(response):
     for line in headers.splitlines():
         if line.lower().startswith("set-cookie:"):
             cookie = line[len("Set-Cookie: "):].strip()
-            if "=" in cookie:
-                name, value = cookie.split("=", 1)[0:2]
-                cookies.append({"name": name, "value": value.split(";")[0], "domain": None, "expires": None})
+
+            # Extract name and value.
+            match = re.match(r"([^=]+)=([^;]+)", cookie)
+            if match:
+                name, value = match.groups()
+                # Extract the Expires attribute if present.
+                expires_match = re.search(r"Expires=([^;]+)", cookie, re.IGNORECASE)
+                expires = expires_match.group(1) if expires_match else None
+
+                # Add the cookie with its details to the list.
+                cookies.append({
+                    "name": name.strip(),
+                    "value": value.strip(),
+                    "domain": None,  # Domain parsing can be added later if needed.
+                    "expires": expires.strip() if expires else None
+                })
 
     # Optionally process JSON body for cookies.
     if "Content-Type: application/json" in headers:
@@ -222,7 +235,12 @@ def parse_cookies(response):
             json_body = json.loads(body)
             if "cookies" in json_body:
                 for name, value in json_body["cookies"].items():
-                    cookies.append({"name": name, "value": value, "domain": None, "expires": None})
+                    cookies.append({
+                        "name": name,
+                        "value": value,
+                        "domain": None,
+                        "expires": None
+                    })
         except json.JSONDecodeError:
             pass
 
