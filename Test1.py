@@ -76,11 +76,11 @@ class TestWebTester(unittest.TestCase):
         output = self.run_webtester("http://neverssl.com")
         self.assertIn("Website\n=======\nneverssl.com", output)
 
-    # def test_complex_redirect(self):
-    #     """Test complex redirect handling with cookies."""
-    #     output = self.run_webtester("https://httpstat.us/301")
-    #     self.assertIn("Redirecting to", output)
-    #     self.assertIn("Website\n=======\nhttpstat.us", output)
+    def test_complex_redirect(self):
+        """Test complex redirect handling with cookies."""
+        output = self.run_webtester("https://httpstat.us/301")
+        self.assertIn("Redirecting to", output)
+        self.assertIn("Website\n=======\nhttpstat.us", output)
 
     # === Cookies ===
     def test_no_cookies(self):
@@ -103,7 +103,7 @@ class TestWebTester(unittest.TestCase):
 
     # def test_cookie_with_expiry(self):
     #     """Test a website that sets cookies with expiry dates."""
-    #     output = self.run_webtester("https://httpbin.org/response-headers?Set-Cookie=test=123; Expires=Wed, 21 Jan 2026 12:34:56 GMT")
+    #     output = self.run_webtester("https://httpbin.org/response-headers?Set-Cookie=test=123%3B%20Expires=Wed%2C%2021%20Jan%202026%2012%3A34%3A56%20GMT")
     #     self.assertRegex(output, r"Cookie Name: test")
     #     self.assertRegex(output, r"Expires: Wed, 21 Jan 2026 12:34:56 GMT")
 
@@ -120,7 +120,6 @@ class TestWebTester(unittest.TestCase):
             "https://httpbin.org/basic-auth/user/pass",
             "https://login.salesforce.com",
             "https://accounts.google.com",
-            # "https://id.atlassian.com/login", NO RESPONSE
             "docs.engr.uvic.ca/docs", # Say N0
             "https://www.netflix.com/login"
         ]
@@ -133,7 +132,7 @@ class TestWebTester(unittest.TestCase):
         public_urls = [
             "https://example.com",
             "https://www.wikipedia.org",
-           # "https://www.github.com", ## yes
+            "https://www.google.com",
             "https://httpbin.org",
             "https://www.cloudflare.com"
         ]

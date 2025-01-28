@@ -184,6 +184,7 @@ def handle_redirect(response_text, host, path, protocol, use_https):
         path = path or "/"
         protocol = "https" if new_url.startswith("https") else "http"
         use_https = protocol == "https"
+        print(f"Redirecting to {new_url}")
         return new_url, host, path, protocol, use_https
     else:
         return None, host, path, protocol, use_https
