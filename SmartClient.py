@@ -40,6 +40,7 @@ def check_http2_support(host, port=443):
         print(f"Error while checking HTTP/2 support: {e}")  # Handle errors gracefully.
         return False  # Return False if HTTP/2 support cannot be determined.
 
+
 def send_http_request(host, path="/", use_https=False, max_redirects=5):
     """Send an HTTP or HTTPS request and handle redirects."""
     visited_urls = set()
@@ -54,63 +55,78 @@ def send_http_request(host, path="/", use_https=False, max_redirects=5):
                 return "Cyclic redirect detected"
             visited_urls.add(full_url)
 
-            port = 443 if use_https else 80
-            context = ssl.create_default_context() if use_https else None
+            response_text, cookies = make_request(host, path, use_https, cookies)
+            if response_text is None:
+                return None
+            
+            if "ERROR" in response_text:
+                return None
 
-            with socket.create_connection((host, port)) as conn:
-                if use_https:
-                    conn = context.wrap_socket(conn, server_hostname=host)
-
-                # Include cookies in the request
-                cookie_header = "; ".join([f"{name}={value}" for name, value in cookies.items()])
-                request = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n"
-                if cookie_header:
-                    request += f"Cookie: {cookie_header}\r\n"
-                request += "\r\n"
-
-                conn.sendall(request.encode())
-                response = b""
-                while True:
-                    data = conn.recv(4096)
-                    if not data:
-                        break
-                    response += data
-                response_text = response.decode(errors="ignore")
-
-                # Extract cookies from Set-Cookie headers
-                cookie_headers = re.findall(r"Set-Cookie: (.*?)\r\n", response_text, re.IGNORECASE)
-                for cookie in cookie_headers:
-                    match = re.match(r"([^=]+)=([^;]+);", cookie)
-                    if match:
-                        name, value = match.groups()
-                        cookies[name] = value
-
-                # Check for redirect headers
-                match = re.search(r"^Location: (.*?)\r\n", response_text, re.MULTILINE | re.IGNORECASE)
-                if match:
-                    new_url = match.group(1)
-                    if new_url.startswith("/"):
-                        new_url = f"{protocol}://{host}{new_url}"
-                    match = re.match(r"https?://([^/]+)(/.*)?", new_url)
-                    if not match:
-                        print("Invalid redirect URL.")
-                        return None
-                    host, path = match.groups()
-                    path = path or "/"
-                    protocol = "https" if new_url.startswith("https") else "http"
-                    use_https = protocol == "https"
-                else:
-                    if "ERROR" in response_text:
-                        return None
-
-                    return response_text
+            new_url, host, path, protocol, use_https = handle_redirect(response_text, host, path, protocol, use_https)
+            if new_url is None:
+                return response_text
 
         return None
-    
+
     except Exception as e:
         print(f"Unexpected error: {e}")
         return None
 
+def make_request(host, path, use_https, cookies):
+    """Make an HTTP or HTTPS request and return the response text and cookies."""
+    port = 443 if use_https else 80
+    context = ssl.create_default_context() if use_https else None
+
+    with socket.create_connection((host, port)) as conn:
+        if use_https:
+            conn = context.wrap_socket(conn, server_hostname=host)
+
+        # Include cookies in the request
+        cookie_header = "; ".join([f"{name}={value}" for name, value in cookies.items()])
+        request = f"GET {path} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n"
+        if cookie_header:
+            request += f"Cookie: {cookie_header}\r\n"
+        request += "\r\n"
+
+        conn.sendall(request.encode())
+        response = b""
+        while True:
+            data = conn.recv(4096)
+            if not data:
+                break
+            response += data
+        response_text = response.decode(errors="ignore")
+
+        # Extract cookies from Set-Cookie headers
+        cookie_headers = re.findall(r"Set-Cookie: (.*?)\r\n", response_text, re.IGNORECASE)
+        for cookie in cookie_headers:
+            match = re.match(r"([^=]+)=([^;]+);", cookie)
+            if match:
+                name, value = match.groups()
+                cookies[name] = value
+
+    return response_text, cookies
+
+def handle_redirect(response_text, host, path, protocol, use_https):
+    """Handle HTTP redirects and return the new URL components."""
+    match = re.search(r"^Location: (.*?)\r\n", response_text, re.MULTILINE | re.IGNORECASE)
+    if match:
+        new_url = match.group(1)
+        if new_url.startswith("/"):
+            new_url = f"{protocol}://{host}{new_url}"
+        match = re.match(r"https?://([^/]+)(/.*)?", new_url)
+        if not match:
+            print("Invalid redirect URL.")
+            return None, host, path, protocol, use_https
+        host, path = match.groups()
+        path = path or "/"
+        protocol = "https" if new_url.startswith("https") else "http"
+        use_https = protocol == "https"
+        return new_url, host, path, protocol, use_https
+    else:
+        if "ERROR" in response_text:
+            return None, host, path, protocol, use_https
+        return None, host, path, protocol, use_https
 
 def parse_cookies(response):
     """Parse cookies from the HTTP response."""
@@ -187,6 +203,7 @@ def is_valid_url(url):
         r')'
     )
     return re.match(pattern, url) is not None
+
 
 def main():
     """Main function to handle input and execute functionality."""
