@@ -1,7 +1,3 @@
-Here's a refined and professional README file suitable for a public GitHub repository:
-
----
-
 # **SmartClient: A Web Server Testing Tool**
 
 ## **Overview**
@@ -140,5 +136,3 @@ Contributions are welcome! Please fork the repository, create a branch for your 
 This project is licensed under the MIT License. See the `LICENSE` file for details.
 
 ---
-
-Feel free to adapt this README to better fit your specific GitHub repository, adding any additional details or removing sections as necessary.
