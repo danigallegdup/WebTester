@@ -97,6 +97,8 @@ def send_http_request(host, path="/", use_https=False, max_redirects=5):
                 return None
             
             if "ERROR" in response_text:
+                error_line = re.search(r".*ERROR.*", response_text)
+                print(f"Error detected: {error_line.group(0)}")
                 return None
 
             new_url, host, path, protocol, use_https = handle_redirect(response_text, host, path, protocol, use_https)

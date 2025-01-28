@@ -36,7 +36,7 @@ class TestWebTester(unittest.TestCase):
     def test_unexpected_error(self):
         """Test behavior with an unexpected error."""
         output = self.run_webtester("https://httpbin.org/status/500")
-        self.assertIn("Failed to retrieve HTTP response.", output)
+        self.assertIn("Error detected: HTTP/1.1 500 INTERNAL SERVER ERROR", output)
 
     def test_ssl_error(self):
         """Test behavior with a site requiring SSL that isn't properly configured."""
