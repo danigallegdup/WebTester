@@ -185,12 +185,10 @@ def check_password_protection(response):
     # Default to not password-protected
     return False
 
-
 def format_output(header, content):
     """Format the output for better readability."""
     output = f"\n{header}\n{'=' * len(header)}\n{content}"  # Create a formatted section with a title and content.
     print(output)  # Print the formatted output.
-
 
 def is_valid_url(url): 
     """Check if the given URL is valid."""
@@ -204,61 +202,76 @@ def is_valid_url(url):
     )
     return re.match(pattern, url) is not None
 
+def print_usage():
+    """Print usage instructions."""
+    print("Usage: python3 WebTester.py <URL>")
+    print("Please provide exactly one URL as an argument.")
 
-def main():
-    """Main function to handle input and execute functionality."""
-    if len(sys.argv) != 2:
-        print("Usage: python3 WebTester.py <URL>")
-        print("Please provide exactly one URL as an argument.")
-        return
-
-    # Normalize the URL and add the scheme if missing
-    raw_url = sys.argv[1]
+def normalize_url(raw_url):
+    """Normalize the URL and add the scheme if missing."""
     if not re.match(r"https?://", raw_url):
         raw_url = f"http://{raw_url}"  # Default to HTTP if no scheme is provided
+    return raw_url
 
-    if not is_valid_url(raw_url):
-        print(" line 258 Invalid URL format")
-        return
-
-    # Extract host and path
+def extract_host_and_path(raw_url):
+    """Extract host and path from the URL."""
     match = re.match(r"https?://([^/]+)(/.*)?", raw_url)
     if not match:
-        print("line 264 Invalid URL format")
-        return
-
+        return None, None
     host, path = match.groups()
     path = path or "/"  # Default to root path if none is specified
+    return host, path
 
-    # Debugging: Log raw request and output
+def log_request(raw_url, host):
+    """Log the raw request for debugging purposes."""
     print("---Request begin---")
     print(f"GET {raw_url} HTTP/1.1")
     print(f"Host: {host}")
     print("Connection: Keep-Alive")
     print("---Request end---\n")
 
-    # Format and display output
+def handle_response(response):
+    """Handle the HTTP response."""
+    cookies = parse_cookies(response)
+    cookies_output = "\n".join([
+        f"Cookie Name: {cookie['name']}, Value: {cookie['value']}, Domain: {cookie['domain']}, Expires: {cookie['expires']}"
+        for cookie in cookies
+    ])
+    format_output("Cookies", cookies_output or "No cookies found.")
+
+    is_password_protected = check_password_protection(response)
+    format_output("Password Protection", f"{'Yes' if is_password_protected else 'No'}")
+
+    print("\n---Response body---\n")
+    print(response[:500])  # Optional: Display first 500 characters of the response body
+
+def main():
+    """Main function to handle input and execute functionality."""
+    if len(sys.argv) != 2:
+        print_usage()
+        return
+
+    raw_url = normalize_url(sys.argv[1])
+    if not is_valid_url(raw_url):
+        print("Invalid URL format")
+        return
+
+    host, path = extract_host_and_path(raw_url)
+    if not host:
+        print("Invalid URL format")
+        return
+
+    log_request(raw_url, host)
     format_output("Website", host)
 
-    supports_http2 = check_http2_support(host)  # Check HTTP/2 support
+    supports_http2 = check_http2_support(host)
     format_output("HTTP/2 Support", f"{'Yes' if supports_http2 else 'No'}")
 
     use_https = raw_url.startswith("https")
-    response = send_http_request(host, path, use_https=use_https)  # Fetch HTTP/HTTPS response
+    response = send_http_request(host, path, use_https=use_https)
 
     if response:
-        cookies = parse_cookies(response)
-        cookies_output = "\n".join([
-            f"Cookie Name: {cookie['name']}, Value: {cookie['value']}, Domain: {cookie['domain']}, Expires: {cookie['expires']}"
-            for cookie in cookies
-        ])
-        format_output("Cookies", cookies_output or "No cookies found.")
-
-        is_password_protected = check_password_protection(response)
-        format_output("Password Protection", f"{'Yes' if is_password_protected else 'No'}")
-
-        print("\n---Response body---\n")
-        print(response[:500])  # Optional: Display first 500 characters of the response body
+        handle_response(response)
     else:
         print("Failed to retrieve HTTP response.")
 
