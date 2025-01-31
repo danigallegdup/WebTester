@@ -100,6 +100,11 @@ def send_http_request(host, path="/", use_https=False, max_redirects=5):
                 error_line = re.search(r".*ERROR.*", response_text)
                 print(f"Error detected: {error_line.group(0)}")
                 return None
+            
+            if "404 NOT FOUND" in response_text:
+                error_line = re.search(r".*404 NOT FOUND.*", response_text)
+                print(f"404 detected: {error_line.group(0)}")
+                return None
 
             new_url, host, path, protocol, use_https = handle_redirect(response_text, host, path, protocol, use_https)
             if new_url is None:
@@ -398,6 +403,7 @@ def handle_response(response):
     Returns:
         None
     """
+
     cookies = parse_cookies(response)
     cookies_output = "\n".join([
         f"Cookie Name: {cookie['name']}, Value: {cookie['value']}, Domain: {cookie['domain']}, Expires: {cookie['expires']}"

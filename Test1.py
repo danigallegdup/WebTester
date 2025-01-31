@@ -26,6 +26,11 @@ class TestWebTester(unittest.TestCase):
         """Test behavior with a nonexistent domain."""
         output = self.run_webtester("http://nonexistentdomain123.com")
         self.assertIn("Failed to retrieve HTTP response.", output)
+    
+    def test_404(self):
+        """Test behavior with a nonexistent domain."""
+        output = self.run_webtester("https://httpbin.org/status/404")
+        self.assertIn("Failed to retrieve HTTP response.", output)
 
     def test_network_error(self):
         """Test behavior with unreachable host."""
