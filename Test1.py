@@ -118,6 +118,19 @@ class TestWebTester(unittest.TestCase):
         self.assertIn("Cookies\n=======", output)
         self.assertRegex(output, r"Cookie Name: name")
 
+    def test_cookie_with_domain(self):
+        """Test a website that sets cookies with domain attributes."""
+        output = self.run_webtester("https://httpbin.org/response-headers?Set-Cookie=test=abc%3B%20Domain=example.com")
+        self.assertRegex(output, r"Cookie Name: test")
+        self.assertRegex(output, r"Domain: example.com")
+
+    def test_cookie_without_domain(self):
+        """Test a cookie with no specified domain (should default to Unknown)."""
+        output = self.run_webtester("https://httpbin.org/response-headers?Set-Cookie=test=xyz")
+        self.assertRegex(output, r"Cookie Name: test")
+        self.assertRegex(output, r"Domain: Unknown")
+
+
     # # === Password Protection ===
     def test_password_protected_pages(self):
         """Test detection of password-protected pages."""

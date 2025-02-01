@@ -105,7 +105,7 @@ def send_http_request(host, path="/", use_https=False, max_redirects=5):
                 error_line = re.search(r".*404 NOT FOUND.*", response_text)
                 print(f"404 detected: {error_line.group(0)}")
                 return None
-
+            
             new_url, host, path, protocol, use_https = handle_redirect(response_text, host, path, protocol, use_https)
             if new_url is None:
                 return response_text
@@ -196,9 +196,10 @@ def handle_redirect(response_text, host, path, protocol, use_https):
     else:
         return None, host, path, protocol, use_https
 
+
 def parse_cookies(response):
     """
-    Parse cookies from the HTTP response, including expiry dates.
+    Parse cookies from the HTTP response, including expiry dates and domain attributes.
 
     Args:
         response (str): The HTTP response text.
@@ -224,15 +225,20 @@ def parse_cookies(response):
             match = re.match(r"([^=]+)=([^;]+)", cookie)
             if match:
                 name, value = match.groups()
+
                 # Extract the Expires attribute if present.
                 expires_match = re.search(r"Expires=([^;]+)", cookie, re.IGNORECASE)
                 expires = expires_match.group(1) if expires_match else None
+
+                # Extract the Domain attribute if present.
+                domain_match = re.search(r"Domain=([^;]+)", cookie, re.IGNORECASE)
+                domain = domain_match.group(1) if domain_match else "Unknown"
 
                 # Add the cookie with its details to the list.
                 cookies.append({
                     "name": name.strip(),
                     "value": value.strip(),
-                    "domain": None,  # Domain parsing can be added later if needed.
+                    "domain": domain.strip(),
                     "expires": expires.strip() if expires else None
                 })
 
@@ -245,13 +251,14 @@ def parse_cookies(response):
                     cookies.append({
                         "name": name,
                         "value": value,
-                        "domain": None,
+                        "domain": "Unknown",  # JSON does not typically include domains
                         "expires": None
                     })
         except json.JSONDecodeError:
             pass
 
     return cookies
+
 
 def check_password_protection(response):
     """
@@ -339,7 +346,20 @@ def print_usage():
         None
     """
     print("Usage: python3 WebTester.py <URL>")
-    print("Please provide exactly one URL as an argument.")
+    print("Please provide exactly one URL as an argument")
+    print("\n Acceptable URL Formats:")
+    print("  - https://example.com")
+    print("  - http://example.com")
+    print("  - https://www.google.com/search?q=python")
+    print("  - http://localhost:8000")
+    print("  - https://192.168.1.1")
+    print("  - example.com (auto-normalized to http://example.com)")
+    print("\n Invalid URL Formats:")
+    print("  - ftp://example.com (unsupported protocol)")
+    print("  - example_com (invalid domain)")
+    print("  - //example.com (missing scheme)")
+    print("  - htp://example.com (typo in protocol)")
+    print("\nPlease provide a valid HTTP(S) URL as an argument.")
 
 
 def normalize_url(raw_url):
@@ -433,6 +453,7 @@ def main():
     raw_url = normalize_url(sys.argv[1])
     if not is_valid_url(raw_url):
         print("Invalid URL format")
+        print_usage()
         return
 
     host, path = extract_host_and_path(raw_url)
